@@ -116,20 +116,12 @@ read -p "Common Name (eg, your name or your server's hostname) [ChangeMe]: " key
 
 printf "\n################## Creating the certificates ##################\n"
 
-EASYRSA_RELEASES=( $(
-  curl -s https://api.github.com/repos/OpenVPN/easy-rsa/releases | \
-  grep 'tag_name' | \
-  grep -E '3(\.[0-9]+)+' | \
-  awk '{ print $2 }' | \
-  sed 's/[,|"|v]//g'
-) )
-EASYRSA_LATEST=${EASYRSA_RELEASES[0]}
-
 # Get the rsa keys
-wget -q https://github.com/OpenVPN/easy-rsa/releases/download/v${EASYRSA_LATEST}/EasyRSA-${EASYRSA_LATEST}.tgz
-tar -xaf EasyRSA-${EASYRSA_LATEST}.tgz
-mv EasyRSA-${EASYRSA_LATEST} /etc/openvpn/easy-rsa
-rm -r EasyRSA-${EASYRSA_LATEST}.tgz
+wget "https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.6/EasyRSA-unix-v3.0.6.tgz"
+tar -xaf "EasyRSA-unix-v3.0.6.tgz"
+mv "EasyRSA-v3.0.6" /etc/openvpn/easy-rsa
+rm "EasyRSA-unix-v3.0.6.tgz"
+
 cd /etc/openvpn/easy-rsa
 
 if [[ ! -z $key_size ]]; then
@@ -240,8 +232,14 @@ sed -i "s/\$user = '';/\$user = '$mysql_user';/" "./include/config.php"
 sed -i "s/\$pass = '';/\$pass = '$mysql_pass';/" "./include/config.php"
 
 # Replace in the client configurations with the ip of the server and openvpn protocol
-for file in "./client-conf/gnu-linux/client.conf" "./client-conf/osx-viscosity/client.conf" "./client-conf/windows/client.ovpn"; do
-  sed -i "s/remote xxx\.xxx\.xxx\.xxx 443/remote $ip_server $server_port/" $file
+for file in $(find -name client.ovpn); do
+    sed -i "s/remote xxx\.xxx\.xxx\.xxx 443/remote $ip_server $server_port/" $file
+    echo "<ca>" >> $file
+    cat "/etc/openvpn/ca.crt" >> $file
+    echo "</ca>" >> $file
+    echo "<tls-auth>" >> $file
+    cat "/etc/openvpn/ta.key" >> $file
+    echo "</tls-auth>" >> $file
 
   if [ $openvpn_proto = "udp" ]; then
     sed -i "s/proto tcp-client/proto udp/" $file
